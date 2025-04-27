@@ -3,78 +3,565 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Угадай число</title>
+    <title>Крестики-нолики. Новая эра</title>
     <style>
         body {
             font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .game-info {
+            margin-bottom: 20px;
             text-align: center;
-            padding: 20px;
-            background-color: #f0f8ff;
         }
-        .game-container {
-            max-width: 500px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        
+        .board-container {
+            position: relative;
+            margin-bottom: 20px;
         }
+        
+        #full-board {
+            display: grid;
+            grid-template-columns: repeat(5, 60px);
+            grid-template-rows: repeat(5, 60px);
+            gap: 2px;
+            background-color: #333;
+            border: 3px solid #333;
+        }
+        
+        #movable-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 2px;
+            position: absolute;
+            top: 60px;
+            left: 60px;
+            background-color: rgba(255, 255, 0, 0.2);
+            border: 2px dashed yellow;
+        }
+        
+        .cell {
+            width: 60px;
+            height: 60px;
+            background-color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 36px;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .cell.x {
+            color: #f00;
+        }
+        
+        .cell.o {
+            color: #00f;
+        }
+        
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
         button {
             padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
             background-color: #4CAF50;
             color: white;
             border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 10px;
+            border-radius: 4px;
         }
-        input {
-            padding: 10px;
-            width: 100px;
-            text-align: center;
-            font-size: 16px;
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .rules {
+            max-width: 600px;
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .chip-count {
+            font-weight: bold;
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
-    <div class="game-container">
-        <h1>Угадай число</h1>
-        <p>Я загадал число от 1 до 100. Попробуй угадать!</p>
-        <input type="number" id="guessInput" min="1" max="100">
-        <button onclick="checkGuess()">Проверить</button>
-        <p id="message"></p>
-        <p id="attempts">Попытки: 0</p>
+    <h1>Крестики-нолики. Новая эра</h1>
+    
+    <div class="game-info">
+        <div id="status">Ваш ход (Вы - X)</div>
+        <div class="chip-count">
+            <span>Ваши фишки: <span id="player-chips">4</span></span> | 
+            <span>Фишки ИИ: <span id="ai-chips">4</span></span>
+        </div>
     </div>
-
+    
+    <div class="board-container">
+        <div id="full-board"></div>
+        <div id="movable-grid"></div>
+    </div>
+    
+    <div class="controls">
+        <button id="move-grid-btn" disabled>Передвинуть решетку</button>
+        <button id="reset-btn">Новая игра</button>
+    </div>
+    
+    <div class="rules">
+        <h3>Правила игры:</h3>
+        <ol>
+            <li>Каждому игроку выдается по 4 фишки.</li>
+            <li>Поле игры 5×5, с подвижной решеткой 3×3 в центре.</li>
+            <li>Игроки по очереди ставят фишки в пределах решетки.</li>
+            <li>С 3-го хода можно передвинуть решетку на 1 клетку или переставить фишку соперника.</li>
+            <li>Побеждает тот, кто первый выстроит в ряд 3 фишки своего цвета.</li>
+        </ol>
+    </div>
+    
     <script>
-        let secretNumber = Math.floor(Math.random() * 100) + 1;
-        let attempts = 0;
-
-        function checkGuess() {
-            const guess = parseInt(document.getElementById('guessInput').value);
-            const message = document.getElementById('message');
-            const attemptsElement = document.getElementById('attempts');
+        document.addEventListener('DOMContentLoaded', () => {
+            // Константы игры
+            const BOARD_SIZE = 5;
+            const GRID_SIZE = 3;
+            const INITIAL_CHIPS = 4;
             
-            if (isNaN(guess) || guess < 1 || guess > 100) {
-                message.textContent = "Пожалуйста, введите число от 1 до 100";
-                return;
+            // Элементы DOM
+            const fullBoard = document.getElementById('full-board');
+            const movableGrid = document.getElementById('movable-grid');
+            const statusElement = document.getElementById('status');
+            const playerChipsElement = document.getElementById('player-chips');
+            const aiChipsElement = document.getElementById('ai-chips');
+            const moveGridBtn = document.getElementById('move-grid-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            
+            // Состояние игры
+            let gameState = {
+                board: Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill('')),
+                gridPosition: { x: 1, y: 1 }, // начальная позиция решетки (центр)
+                currentPlayer: 'X', // X - игрок, O - ИИ
+                playerChips: INITIAL_CHIPS,
+                aiChips: INITIAL_CHIPS,
+                moveCount: 0,
+                gameOver: false,
+                inMoveGridMode: false,
+                selectedChip: null
+            };
+            
+            // Инициализация доски
+            function initializeBoard() {
+                fullBoard.innerHTML = '';
+                movableGrid.innerHTML = '';
+                
+                // Создаем клетки основной доски
+                for (let y = 0; y < BOARD_SIZE; y++) {
+                    for (let x = 0; x < BOARD_SIZE; x++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        cell.dataset.x = x;
+                        cell.dataset.y = y;
+                        
+                        cell.addEventListener('click', () => handleCellClick(x, y));
+                        
+                        fullBoard.appendChild(cell);
+                    }
+                }
+                
+                // Создаем клетки подвижной решетки (изначально невидимые, будут перекрывать основные)
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    for (let x = 0; x < GRID_SIZE; x++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell grid-cell';
+                        cell.dataset.gridX = x;
+                        cell.dataset.gridY = y;
+                        
+                        movableGrid.appendChild(cell);
+                    }
+                }
+                
+                updateGridPosition();
+                updateUI();
             }
             
-            attempts++;
-            attemptsElement.textContent = `Попытки: ${attempts}`;
-            
-            if (guess === secretNumber) {
-                message.textContent = `Поздравляю! Ты угадал число за ${attempts} попыток!`;
-                message.style.color = "green";
-                document.getElementById('guessInput').disabled = true;
-            } else if (guess < secretNumber) {
-                message.textContent = "Слишком маленькое число!";
-                message.style.color = "red";
-            } else {
-                message.textContent = "Слишком большое число!";
-                message.style.color = "red";
+            // Обновляет позицию подвижной решетки
+            function updateGridPosition() {
+                movableGrid.style.top = `${gameState.gridPosition.y * 60}px`;
+                movableGrid.style.left = `${gameState.gridPosition.x * 60}px`;
+                
+                // Обновляем видимость клеток решетки
+                document.querySelectorAll('.grid-cell').forEach(cell => {
+                    const gridX = parseInt(cell.dataset.gridX);
+                    const gridY = parseInt(cell.dataset.gridY);
+                    const boardX = gameState.gridPosition.x + gridX;
+                    const boardY = gameState.gridPosition.y + gridY;
+                    
+                    // Копируем содержимое из основной доски
+                    const mainCell = document.querySelector(`.cell[data-x="${boardX}"][data-y="${boardY}"]`);
+                    cell.className = 'cell grid-cell ' + mainCell.className.replace('cell', '').trim();
+                    cell.textContent = mainCell.textContent;
+                });
             }
-        }
+            
+            // Обновляет интерфейс
+            function updateUI() {
+                // Обновляем статус
+                if (gameState.gameOver) {
+                    statusElement.textContent = `Игра окончена. ${gameState.currentPlayer === 'X' ? 'Вы победили!' : 'ИИ победил!'}`;
+                } else {
+                    statusElement.textContent = gameState.currentPlayer === 'X' ? 'Ваш ход (X)' : 'Ход ИИ (O)';
+                }
+                
+                // Обновляем счетчики фишек
+                playerChipsElement.textContent = gameState.playerChips;
+                aiChipsElement.textContent = gameState.aiChips;
+                
+                // Обновляем кнопку перемещения решетки
+                moveGridBtn.disabled = gameState.gameOver || gameState.currentPlayer !== 'X' || gameState.moveCount < 2;
+                
+                // Обновляем содержимое доски
+                for (let y = 0; y < BOARD_SIZE; y++) {
+                    for (let x = 0; x < BOARD_SIZE; x++) {
+                        const cell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+                        cell.className = 'cell';
+                        cell.textContent = gameState.board[y][x];
+                        
+                        if (gameState.board[y][x] === 'X') {
+                            cell.classList.add('x');
+                        } else if (gameState.board[y][x] === 'O') {
+                            cell.classList.add('o');
+                        }
+                    }
+                }
+                
+                updateGridPosition();
+            }
+            
+            // Обработчик клика по клетке
+            function handleCellClick(x, y) {
+                if (gameState.gameOver) return;
+                
+                if (gameState.currentPlayer === 'X') {
+                    handlePlayerMove(x, y);
+                }
+            }
+            
+            // Обработчик хода игрока
+            function handlePlayerMove(x, y) {
+                if (gameState.inMoveGridMode) {
+                    // Режим перемещения решетки
+                    const dx = x - gameState.gridPosition.x - 1; // -1, 0, 1
+                    const dy = y - gameState.gridPosition.y - 1; // -1, 0, 1
+                    
+                    // Проверяем, что перемещение только на 1 клетку по горизонтали или вертикали
+                    if ((Math.abs(dx) === 1 && dy === 0) || (Math.abs(dy) === 1 && dx === 0)) {
+                        const newX = gameState.gridPosition.x + dx;
+                        const newY = gameState.gridPosition.y + dy;
+                        
+                        // Проверяем, что решетка не выходит за границы
+                        if (newX >= 0 && newY >= 0 && newX + GRID_SIZE <= BOARD_SIZE && newY + GRID_SIZE <= BOARD_SIZE) {
+                            gameState.gridPosition.x = newX;
+                            gameState.gridPosition.y = newY;
+                            gameState.inMoveGridMode = false;
+                            gameState.selectedChip = null;
+                            nextTurn();
+                        }
+                    }
+                } else if (gameState.selectedChip) {
+                    // Режим перемещения фишки соперника
+                    const [chipX, chipY] = gameState.selectedChip;
+                    
+                    // Проверяем, что новая позиция находится в решетке и пустая
+                    if (isInGrid(x, y) && gameState.board[y][x] === '') {
+                        gameState.board[y][x] = gameState.board[chipY][chipX];
+                        gameState.board[chipY][chipX] = '';
+                        gameState.selectedChip = null;
+                        gameState.inMoveGridMode = false;
+                        
+                        // Проверяем победу после перемещения фишки
+                        if (checkWin('O')) {
+                            gameState.gameOver = true;
+                            updateUI();
+                            return;
+                        }
+                        
+                        nextTurn();
+                    }
+                } else {
+                    // Обычный ход - постановка фишки
+                    if (isInGrid(x, y) && gameState.board[y][x] === '' && 
+                        (gameState.currentPlayer === 'X' ? gameState.playerChips > 0 : gameState.aiChips > 0)) {
+                        
+                        gameState.board[y][x] = gameState.currentPlayer;
+                        
+                        if (gameState.currentPlayer === 'X') {
+                            gameState.playerChips--;
+                        } else {
+                            gameState.aiChips--;
+                        }
+                        
+                        gameState.moveCount++;
+                        
+                        // Проверяем победу
+                        if (checkWin(gameState.currentPlayer)) {
+                            gameState.gameOver = true;
+                            updateUI();
+                            return;
+                        }
+                        
+                        nextTurn();
+                    }
+                }
+                
+                updateUI();
+            }
+            
+            // Проверяет, находится ли клетка в подвижной решетке
+            function isInGrid(x, y) {
+                return x >= gameState.gridPosition.x && 
+                       x < gameState.gridPosition.x + GRID_SIZE &&
+                       y >= gameState.gridPosition.y && 
+                       y < gameState.gridPosition.y + GRID_SIZE;
+            }
+            
+            // Переход хода
+            function nextTurn() {
+                gameState.currentPlayer = gameState.currentPlayer === 'X' ? 'O' : 'X';
+                
+                if (gameState.currentPlayer === 'O' && !gameState.gameOver) {
+                    // Ход ИИ
+                    setTimeout(makeAIMove, 500);
+                }
+                
+                updateUI();
+            }
+            
+            // Ход ИИ
+            function makeAIMove() {
+                if (gameState.gameOver) return;
+                
+                // 1. Проверяем, может ли ИИ выиграть
+                const winningMove = findWinningMove('O');
+                if (winningMove) {
+                    handlePlayerMove(winningMove.x, winningMove.y);
+                    return;
+                }
+                
+                // 2. Проверяем, может ли игрок выиграть следующим ходом, блокируем
+                const blockingMove = findWinningMove('X');
+                if (blockingMove) {
+                    handlePlayerMove(blockingMove.x, blockingMove.y);
+                    return;
+                }
+                
+                // 3. Если это 3+ ход и есть фишки соперника, пытаемся переместить решетку или фишку
+                if (gameState.moveCount >= 2 && Math.random() > 0.5) {
+                    // Пытаемся переместить решетку
+                    const possibleGridMoves = [];
+                    
+                    // Проверяем все возможные перемещения решетки
+                    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+                        const newX = gameState.gridPosition.x + dx;
+                        const newY = gameState.gridPosition.y + dy;
+                        
+                        if (newX >= 0 && newY >= 0 && newX + GRID_SIZE <= BOARD_SIZE && newY + GRID_SIZE <= BOARD_SIZE) {
+                            possibleGridMoves.push({dx, dy, x: newX, y: newY});
+                        }
+                    }
+                    
+                    if (possibleGridMoves.length > 0) {
+                        // Выбираем случайное перемещение решетки
+                        const move = possibleGridMoves[Math.floor(Math.random() * possibleGridMoves.length)];
+                        gameState.gridPosition.x = move.x;
+                        gameState.gridPosition.y = move.y;
+                        nextTurn();
+                        return;
+                    }
+                    
+                    // Пытаемся переместить фишку игрока
+                    const playerChips = [];
+                    for (let y = 0; y < BOARD_SIZE; y++) {
+                        for (let x = 0; x < BOARD_SIZE; x++) {
+                            if (gameState.board[y][x] === 'X' && isInGrid(x, y)) {
+                                playerChips.push([x, y]);
+                            }
+                        }
+                    }
+                    
+                    if (playerChips.length > 0) {
+                        // Выбираем случайную фишку игрока
+                        const [chipX, chipY] = playerChips[Math.floor(Math.random() * playerChips.length)];
+                        
+                        // Ищем пустую клетку в решетке для перемещения
+                        const emptyCells = [];
+                        for (let y = gameState.gridPosition.y; y < gameState.gridPosition.y + GRID_SIZE; y++) {
+                            for (let x = gameState.gridPosition.x; x < gameState.gridPosition.x + GRID_SIZE; x++) {
+                                if (gameState.board[y][x] === '' && (x !== chipX || y !== chipY)) {
+                                    emptyCells.push({x, y});
+                                }
+                            }
+                        }
+                        
+                        if (emptyCells.length > 0) {
+                            const target = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                            gameState.board[target.y][target.x] = 'X';
+                            gameState.board[chipY][chipX] = '';
+                            nextTurn();
+                            return;
+                        }
+                    }
+                }
+                
+                // 4. Ставим фишку в случайную пустую клетку в решетке
+                const emptyCells = [];
+                for (let y = gameState.gridPosition.y; y < gameState.gridPosition.y + GRID_SIZE; y++) {
+                    for (let x = gameState.gridPosition.x; x < gameState.gridPosition.x + GRID_SIZE; x++) {
+                        if (gameState.board[y][x] === '') {
+                            emptyCells.push({x, y});
+                        }
+                    }
+                }
+                
+                if (emptyCells.length > 0 && gameState.aiChips > 0) {
+                    const move = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                    handlePlayerMove(move.x, move.y);
+                } else {
+                    // Если нет возможных ходов, пропускаем ход
+                    nextTurn();
+                }
+            }
+            
+            // Ищет выигрышный ход для указанного игрока
+            function findWinningMove(player) {
+                // Проверяем все клетки в решетке
+                for (let y = gameState.gridPosition.y; y < gameState.gridPosition.y + GRID_SIZE; y++) {
+                    for (let x = gameState.gridPosition.x; x < gameState.gridPosition.x + GRID_SIZE; x++) {
+                        if (gameState.board[y][x] === '') {
+                            // Пробуем поставить фишку
+                            gameState.board[y][x] = player;
+                            
+                            // Проверяем, приводит ли это к победе
+                            const isWin = checkWin(player);
+                            
+                            // Отменяем ход
+                            gameState.board[y][x] = '';
+                            
+                            if (isWin) {
+                                return {x, y};
+                            }
+                        }
+                    }
+                }
+                
+                return null;
+            }
+            
+            // Проверяет, есть ли выигрышная комбинация
+            function checkWin(player) {
+                // Проверяем все возможные линии на полной доске 5x5
+                const directions = [
+                    [1, 0],  // горизонталь
+                    [0, 1],   // вертикаль
+                    [1, 1],   // диагональ \
+                    [1, -1]   // диагональ /
+                ];
+                
+                for (let y = 0; y < BOARD_SIZE; y++) {
+                    for (let x = 0; x < BOARD_SIZE; x++) {
+                        if (gameState.board[y][x] === player) {
+                            for (const [dx, dy] of directions) {
+                                let count = 1;
+                                
+                                // Проверяем в одном направлении
+                                for (let i = 1; i < 3; i++) {
+                                    const nx = x + dx * i;
+                                    const ny = y + dy * i;
+                                    
+                                    if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE && 
+                                        gameState.board[ny][nx] === player) {
+                                        count++;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                
+                                // Проверяем в противоположном направлении
+                                for (let i = 1; i < 3; i++) {
+                                    const nx = x - dx * i;
+                                    const ny = y - dy * i;
+                                    
+                                    if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE && 
+                                        gameState.board[ny][nx] === player) {
+                                        count++;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                
+                                if (count >= 3) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                return false;
+            }
+            
+            // Обработчик кнопки перемещения решетки
+            moveGridBtn.addEventListener('click', () => {
+                if (gameState.currentPlayer === 'X' && gameState.moveCount >= 2 && !gameState.gameOver) {
+                    gameState.inMoveGridMode = true;
+                    statusElement.textContent = 'Выберите направление для перемещения решетки';
+                    updateUI();
+                }
+            });
+            
+            // Обработчик кнопки новой игры
+            resetBtn.addEventListener('click', () => {
+                gameState = {
+                    board: Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill('')),
+                    gridPosition: { x: 1, y: 1 },
+                    currentPlayer: 'X',
+                    playerChips: INITIAL_CHIPS,
+                    aiChips: INITIAL_CHIPS,
+                    moveCount: 0,
+                    gameOver: false,
+                    inMoveGridMode: false,
+                    selectedChip: null
+                };
+                
+                initializeBoard();
+            });
+            
+            // Запускаем игру
+            initializeBoard();
+        });
     </script>
 </body>
 </html>
