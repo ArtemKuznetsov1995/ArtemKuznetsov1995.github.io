@@ -18,6 +18,8 @@
         h1 {
             color: #333;
             margin-bottom: 10px;
+            text-align: center;
+            width: 100%;
         }
         
         .game-info {
@@ -47,8 +49,9 @@
             position: absolute;
             top: 60px;
             left: 60px;
-            background-color: rgba(255, 255, 0, 0.2);
-            border: 2px dashed yellow;
+            background-color: rgba(0, 0, 255, 0.1);
+            /* Убрали внешние границы */
+            border: none;
         }
         
         .cell {
@@ -110,9 +113,39 @@
             font-weight: bold;
             margin-top: 10px;
         }
+
+        .start-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .start-screen h2 {
+            color: white;
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+
+        .start-screen button {
+            font-size: 1.5em;
+            padding: 15px 30px;
+        }
     </style>
 </head>
 <body>
+    <div class="start-screen" id="start-screen">
+        <h2>Крестики-нолики. Новая эра</h2>
+        <button id="start-btn">Начать игру</button>
+    </div>
+    
     <h1>Крестики-нолики. Новая эра</h1>
     
     <div class="game-info">
@@ -159,6 +192,8 @@
             const aiChipsElement = document.getElementById('ai-chips');
             const moveGridBtn = document.getElementById('move-grid-btn');
             const resetBtn = document.getElementById('reset-btn');
+            const startScreen = document.getElementById('start-screen');
+            const startBtn = document.getElementById('start-btn');
             
             // Состояние игры
             let gameState = {
@@ -544,6 +579,17 @@
             
             // Обработчик кнопки новой игры
             resetBtn.addEventListener('click', () => {
+                resetGame();
+            });
+            
+            // Обработчик кнопки начать игру
+            startBtn.addEventListener('click', () => {
+                startScreen.style.display = 'none';
+                resetGame();
+            });
+            
+            // Сброс игры
+            function resetGame() {
                 gameState = {
                     board: Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill('')),
                     gridPosition: { x: 1, y: 1 },
@@ -557,10 +603,10 @@
                 };
                 
                 initializeBoard();
-            });
+            }
             
-            // Запускаем игру
-            initializeBoard();
+            // Показываем стартовый экран
+            startScreen.style.display = 'flex';
         });
     </script>
 </body>
